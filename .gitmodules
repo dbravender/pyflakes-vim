@@ -1,3 +1,6 @@
 [submodule "ftplugin/python/pyflakes"]
 	path = ftplugin/python/pyflakes
 	url = git://github.com/pyflakes/pyflakes.git
+[submodule "ftplugin/python/pep8"]
+	path = ftplugin/python/pep8
+	url = https://github.com/jcrocholl/pep8.git

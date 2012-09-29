@@ -84,6 +84,12 @@ Set this option in your vimrc file to disable quickfix support::
 
 The value is set to 1 by default.
 
+PEP-8 Options::
+    
+    let g:pep8_check = 0         " Turn off PEP-8 checking (on by default)
+    let g:pep8_ignore = ['E501'] " Ignore certain PEP-8 errors and warnings
+                                 " (none are ignored by default)
+
 TODO
 ----
  * signs_ support (show warning and error icons to left of the buffer area)

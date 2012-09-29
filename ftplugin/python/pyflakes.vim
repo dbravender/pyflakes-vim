@@ -21,6 +21,14 @@ if !exists('g:pyflakes_builtins')
     let g:pyflakes_builtins = []
 endif
 
+if !exists('g:pep8_ignore')
+    let g:pep8_ignore = []
+endif
+
+if !exists('g:pep8_check')
+    let g:pep8_check = 1
+endif
+
 if !exists("b:did_python_init")
     let b:did_python_init = 0
 
@@ -49,6 +57,7 @@ if scriptdir not in sys.path:
 
 import ast
 from pyflakes import checker, messages
+import pep8
 from operator import attrgetter
 import re
 
@@ -56,6 +65,14 @@ class loc(object):
     def __init__(self, lineno, col=None):
         self.lineno = lineno
         self.col_offset = col
+
+
+class Pep8Message(messages.Message):
+    message = 'PEP-8 (%s): %s'
+    def __init__(self, code, filename, lineno, col, message):
+        messages.Message.__init__(self, filename, loc(lineno, col))
+        self.message_args = (code, message,)
+
 
 class SyntaxError(messages.Message):
     message = 'could not compile: %s'
@@ -65,6 +82,63 @@ class SyntaxError(messages.Message):
 
 class blackhole(object):
     write = flush = lambda *a, **k: None
+
+
+def pep8_check(code, filename, ignore=None):
+    # Originally appeared in the SublimeLinter project where the following
+    # message appeared:
+    # It is a fork by André Roberge from the original SublimeLint project,
+    # (c) 2011 Ryan Hileman and licensed under the MIT license.
+    # Modified so it works in pyflakes-vim by Dan Bravender.
+    messages = []
+
+    if not eval(vim.eval('string(g:pep8_check)')):
+        return []
+
+    _lines = code.split('\n')
+
+    if _lines:
+        def report_error(self, line_number, offset, text, check):
+            code = text[:4]
+            msg = text[5:]
+
+            if pep8.ignore_code(code):
+                return
+            elif code.startswith('E'):
+                messages.append(Pep8Message(
+                    code, filename, line_number, offset, msg))
+            else:
+                messages.append(Pep8Message(
+                    code, filename, line_number, offset, msg))
+
+        pep8.Checker.report_error = report_error
+        _ignore = (
+            eval(vim.eval('string(g:pep8_ignore)')) +
+            pep8.DEFAULT_IGNORE.split(','))
+
+        class FakeOptions:
+            verbose = 0
+            select = []
+            ignore = _ignore
+
+        pep8.options = FakeOptions()
+        pep8.options.physical_checks = pep8.find_checks('physical_line')
+        pep8.options.logical_checks = pep8.find_checks('logical_line')
+        pep8.options.max_line_length = pep8.MAX_LINE_LENGTH
+        pep8.options.counters = dict.fromkeys(pep8.BENCHMARK_KEYS, 0)
+        good_lines = [l + '\n' for l in _lines]
+        good_lines[-1] = good_lines[-1].rstrip('\n')
+
+        if not good_lines[-1]:
+            good_lines = good_lines[:-1]
+
+        try:
+            pep8.Checker(filename, good_lines).check_all()
+        except Exception, e:
+            print "pep8: %s" % e
+
+    return messages
+
 
 def check(buffer):
     filename = buffer.name
@@ -120,6 +194,7 @@ def check(buffer):
 
         checker._MAGIC_GLOBALS = old_globals
 
+        w.messages.extend(pep8_check(contents, filename))
         w.messages.sort(key = attrgetter('lineno'))
         return w.messages
 
